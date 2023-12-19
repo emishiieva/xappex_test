@@ -13,11 +13,12 @@ const FILE_URL = 'https://www.stats.govt.nz/assets/Uploads/Annual-enterprise-sur
 
 const defaultValues = {
   url: FILE_URL,
-  rows: 1,
+  rows: '1',
 }
 
 function App() {
-  const [url, setUrl] = useState(FILE_URL);
+  const [url, setUrl] = useState(defaultValues.url);
+  const [rows, setRows] = useState(defaultValues.rows);
   const [fileData, setFileData] = useState([]);
   const [error, setError] = useState('');
   const [rowsToShow, setRowsToShow] = useState(1);
@@ -67,14 +68,10 @@ function App() {
 
   const handleSubmit = (event) => {
     event.preventDefault();
-    const data = new FormData(event.currentTarget);
-    const fieldUrl = data.get('fieldUrl');
-    const rows = data.get('rows');
+    setRowsToShow(rows);
 
-    if (fieldUrl && rows) {
+    if (url && rowsToShow) {
       setFormErrors(false);
-      setUrl(fieldUrl);
-      setRowsToShow(rows);
 
       if (!isDownloaded) {
         if (!isOpen) {
@@ -116,7 +113,8 @@ function App() {
             label='Enter URL'
             autoComplete='fieldUrl'
             autoFocus
-            defaultValue={defaultValues.url}
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
           />
           <TextField
             error={formErrors}
@@ -128,8 +126,9 @@ function App() {
             label='Enter rows to show'
             autoComplete='rows'
             autoFocus
-            defaultValue={defaultValues.rows}
+            value={rows}
             required
+            onChange={(e) => setRows(e.target.value)}
           />
           <Button
             fullWidth
