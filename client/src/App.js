@@ -31,13 +31,8 @@ function App() {
   const [count, setCount] = useState(0);
 
   useEffect(() => {
-    socket.on('fileData', (row) => {
-      setFileData((prevState) => {
-        return [
-          ...prevState,
-          row,
-        ]
-      });
+    socket.on('fileData', (data) => {
+      setFileData(data);
     });
 
     socket.on('headers', (headers) => {

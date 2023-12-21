@@ -2,15 +2,14 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
-const fs = require('fs');
 const highland = require('highland');
 const request = require('request');
+const parse = require('csv-parser');
 
 const app = express();
 app.use(cors());
 
 const server = http.createServer(app);
-const filePath = 'server/Cost_centers.csv';
 
 const io = new Server(server, {
   cors: {
@@ -19,52 +18,46 @@ const io = new Server(server, {
   },
 });
 
+const transformRow = (row) => {
+  for (let key in row) {
+    row[key] = row[key].toUpperCase()
+  }
+  return row;
+};
+
 io.on('connection', (socket) => {
-  const stream = highland(fs.createReadStream(filePath));
   let count = 0;
   socket.on('loadFile', (data) => {
-    const {url} = data;
-    const through = highland.pipeline(s => {
+    const { url } = data;
 
-      let headStream;
-      let headers = [];
-
-      s = s
-        .split()
-        .compact()
-        .map((row) => {
-          count++;
-          return row.split(',');
-        });
-
-      headStream = s.observe();
-      s.pause();
-      s = s
-        .drop(1)
-        .map((row) => {
-          const obj = headers.reduce((obj, key, i) => {
-            obj[key] = row[i].toUpperCase();
-
-            return obj;
-          }, {});
-          socket.emit('fileData', obj)
-        });
-
-      headStream.head().toArray((rows) => {
-        headers = rows[0];
-        socket.emit('headers', headers);
-        s.resume();
-      });
-      return s;
-    })
-
-    highland(request.get(url))
-      .pipe(through)
-      .errors((err) => {
-        socket.emit('fileError', err.message);
+    const parseCSV = () => {
+      return highland((push, next) => {
+        request.get(url)
+          .pipe(parse())
+          .on('data', (data) => {
+            push(null, data)
+          })
+          .on('headers', (headers) => {
+            socket.emit('headers', headers);
+          })
+          .on('end', () => push(null, highland.nil))
+          .on('error', (error) => push(error));
       })
-      .done(() => {
-        socket.emit('fileEnd', count);
+    }
+
+    parseCSV()
+      .map((row) => {
+        return transformRow(row);
+      })
+      .collect()
+      .toCallback((err, rows) => {
+        if (err) {
+          socket.emit('fileError', err.message);
+          return;
+        }
+        
+        socket.emit('fileData', rows);
+        socket.emit('fileEnd', rows.length);
       });
   });
 });
